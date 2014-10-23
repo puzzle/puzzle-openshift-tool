@@ -1,0 +1,121 @@
+#! /bin/bash
+
+# Copyright 2014 Daniel Tschan <tschan@puzzle.ch>.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+GEAR=jbosseap
+
+action=$1
+shift
+
+function usage {
+  echo ""
+	echo "Puzzle OpenShift Tool usage:"
+	echo "  pot COMMAND [ARGS]"
+	echo ""
+	echo "Commands:"
+	echo "  tar: create a tarball for OpenShift binary deployment"
+  echo "  deploy: configures the specified gear for binary deployment and deploys a previously created tarball"
+  echo ""
+  echo "tar usage:"
+  echo "  pot tar <config_dir> <artifact>..."
+  echo ""
+  echo "  <config_dir>  directory that contains the .openshift directory."
+  echo "  <artifact>    one or more artifacts which should be included in the tarball for deployment."
+  echo ""
+  echo "deploy usage:"
+  echo "  pot deploy <env>"
+  echo ""
+  echo "  <env>                environment on which to deploy. Selects which set of the following environment variables is used."
+  echo "  POT_SERVER_<env>     environment variable specifying on which OpenShift broker to deploy. E.g. redhat.openshift.com for OpenShift online."
+  echo "  POT_APP_<env>        environment variable specifying OpenShift application to deploy."
+  echo "  POT_NAMESPACE_<env>  environment variable specifying namespace of the OpenShift application to deploy."
+  echo "  POT_USER             environment variable specifying OpenShift login used for deploy."
+  echo "  POT_PASSWORD         environment variable specifying OpenShift password used for deploy."
+  echo ""
+
+	exit 1
+}
+
+function cmd_tar {
+	if [ $# -lt 2 ]; then
+		usage
+	fi
+
+	openshift_config_dir="$1"
+	shift
+
+	rm -rf deployment.tmp
+	mkdir -p deployment.tmp/build_dependencies deployment.tmp/dependencies/${GEAR}/deployments deployment.tmp/repo/.openshift
+	cp "$@" deployment.tmp/dependencies/${GEAR}/deployments
+	rsync -avC "$openshift_config_dir"/.openshift/ deployment.tmp/repo/.openshift/
+	( cd deployment.tmp && GZIP=-9 tar cvfz ../deployment.tar.gz . )
+	rm -rf deployment.tmp
+}
+
+function cmd_deploy {
+	env=$1
+
+	eval server=\$POT_SERVER_$env
+	eval namespace=\$POT_NAMESPACE_$env
+	eval app=\$POT_APP_$env
+	eval env=\$POT_ENV_$env
+	eval user=$POT_USER
+	eval password=$POT_PASSWORD
+
+	if [ -t 0 ]; then
+		CONFIG=""
+	else
+		CONFIG="--config=/dev/null"
+	fi
+
+	if [ -n "$password" ]; then
+		password="-p$password"
+	fi
+
+	if [ -n "$env" ]; then
+		rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app env set $env
+	fi
+
+	rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app app configure --deployment-type binary
+	rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app app deploy deployment.tar.gz
+}
+
+function cmd_git_url {
+  env=$1
+
+  eval server=\$POT_SERVER_$env
+  eval namespace=\$POT_NAMESPACE_$env
+  eval app=\$POT_APP_$env
+  eval user=\$POT_USER_$env
+  eval password=\$POT_PASSWORD_$env
+
+  eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server -n$namespace -a$app -l$user -p$password ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
+  echo "ssh://${_OPENSHIFT_APP_UUID}@${_OPENSHIFT_APP_DNS}/~/git/${_OPENSHIFT_APP_NAME}.git/"
+}
+
+case $action in
+	tar)
+	cmd_tar "$@"
+  ;;
+	deploy)
+	cmd_deploy "$@"
+	;;
+  git-url)
+  git_urlCmd "$@"
+  ;;
+*)
+	usage
+  ;;
+esac
