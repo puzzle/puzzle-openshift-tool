@@ -19,6 +19,38 @@ GEAR=jbosseap
 action=$1
 shift
 
+function init_rhc_config {
+  eval server=\$POT_SERVER_$1
+  eval user=\$POT_USER_$1
+  eval password=\$POT_PASSWORD_$1
+  eval namespace=\$POT_NAMESPACE_$1
+  eval app=\$POT_APP_$1
+  eval env=\$POT_ENV_$1
+
+  if [ -t 0 ]; then
+	  config=""
+  else
+	  config="--config=/dev/null"
+  fi
+
+  if [ -z "$server" ]; then
+	  server="openshift.redhat.com"
+  fi
+
+  if [ "$user" ]; then
+	  user="-l$user"
+  fi
+
+  if [ "$password" ]; then
+	  password="-p$password"
+  fi
+
+  if [ "$namespace" ]; then
+	  namespace="-n$namespace"
+  fi
+}
+
+
 function usage {
   echo ""
 	echo "Puzzle OpenShift Tool usage:"
@@ -38,7 +70,7 @@ function usage {
   echo "  pot deploy <env>"
   echo ""
   echo "  <env>                environment on which to deploy. Selects which set of the following environment variables is used."
-  echo "  POT_SERVER_<env>     environment variable specifying on which OpenShift broker to deploy. E.g. redhat.openshift.com for OpenShift online."
+  echo "  POT_SERVER_<env>     environment variable specifying on which OpenShift broker to deploy. Defaults to openshift.redhat.com (OpenShift Online)."
   echo "  POT_APP_<env>        environment variable specifying OpenShift application to deploy."
   echo "  POT_NAMESPACE_<env>  environment variable specifying namespace of the OpenShift application to deploy."
   echo "  POT_USER             environment variable specifying OpenShift login used for deploy."
@@ -65,41 +97,20 @@ function cmd_tar {
 }
 
 function cmd_deploy {
-	env=$1
+  init_rhc_config $1
+  shift
 
-	eval server=\$POT_SERVER_$env
-	eval namespace=\$POT_NAMESPACE_$env
-	eval app=\$POT_APP_$env
-	eval env=\$POT_ENV_$env
-	eval user=$POT_USER
-	eval password=$POT_PASSWORD
+  if [ "$env" ]; then
+    rhc $config --server=$server $namespace $user $password -a$app env set $env
+  fi
 
-	if [ -t 0 ]; then
-		CONFIG=""
-	else
-		CONFIG="--config=/dev/null"
-	fi
-
-	if [ -n "$password" ]; then
-		password="-p$password"
-	fi
-
-	if [ -n "$env" ]; then
-		rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app env set $env
-	fi
-
-	rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app app configure --deployment-type binary
-	rhc $CONFIG --server=$server --namespace=$namespace -k -l$user $password -a$app app deploy deployment.tar.gz
+  rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary
+  rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz
 }
 
 function cmd_git_url {
-  env=$1
-
-  eval server=\$POT_SERVER_$env
-  eval namespace=\$POT_NAMESPACE_$env
-  eval app=\$POT_APP_$env
-  eval user=\$POT_USER_$env
-  eval password=\$POT_PASSWORD_$env
+  init_rhc_config $1
+  shift
 
   eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server -n$namespace -a$app -l$user -p$password ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
   echo "ssh://${_OPENSHIFT_APP_UUID}@${_OPENSHIFT_APP_DNS}/~/git/${_OPENSHIFT_APP_NAME}.git/"
@@ -107,15 +118,16 @@ function cmd_git_url {
 
 case $action in
 	tar)
-	cmd_tar "$@"
-  ;;
+	  cmd_tar "$@"
+    ;;
 	deploy)
-	cmd_deploy "$@"
-	;;
+  	cmd_deploy "$@"
+	  ;;
   git-url)
-  git_urlCmd "$@"
-  ;;
-*)
-	usage
-  ;;
+    cmd_git_url "$@"
+    ;;
+    ;;
+  *)
+  	usage
+    ;;
 esac
