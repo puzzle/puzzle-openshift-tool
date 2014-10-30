@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-GEAR=jbosseap
-
 action=$1
 shift
 
@@ -89,8 +87,8 @@ function cmd_tar {
 	shift
 
 	rm -rf deployment.tmp
-	mkdir -p deployment.tmp/build_dependencies deployment.tmp/dependencies/${GEAR}/deployments deployment.tmp/repo/.openshift
-	cp "$@" deployment.tmp/dependencies/${GEAR}/deployments
+	mkdir -p deployment.tmp/build_dependencies deployment.tmp/repo/deployments deployment.tmp/dependencies/jbossas/deployments deployment.tmp/dependencies/jbosseap/deployments deployment.tmp/repo/.openshift
+	cp "$@" deployment.tmp/repo/deployments
 	rsync -avC "$openshift_config_dir"/.openshift/ deployment.tmp/repo/.openshift/
 	( cd deployment.tmp && GZIP=-9 tar cvfz ../deployment.tar.gz . )
 	rm -rf deployment.tmp
@@ -100,11 +98,11 @@ function cmd_deploy {
   init_rhc_config $1
   shift
 
-  if [ "$env" ]; then
-    rhc $config --server=$server $namespace $user $password -a$app env set $env
-  fi
+	if [ "$env" ]; then
+		rhc $config --server=$server $namespace $user $password -a$app env set $env
+	fi
 
-  rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary
+	rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary
   rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz
 }
 
@@ -125,7 +123,6 @@ case $action in
 	  ;;
   git-url)
     cmd_git_url "$@"
-    ;;
     ;;
   *)
   	usage
