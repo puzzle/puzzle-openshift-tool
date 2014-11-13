@@ -1,3 +1,4 @@
+
 #! /bin/bash
 
 # Copyright 2014 Daniel Tschan <tschan@puzzle.ch>.
@@ -17,23 +18,35 @@
 action=$1
 shift
 
-function init_rhc_config {
-  eval server=\$POT_SERVER_$1
-  eval user=\$POT_USER_$1
-  eval password=\$POT_PASSWORD_$1
-  eval namespace=\$POT_NAMESPACE_$1
-  eval app=\$POT_APP_$1
-  eval env=\$POT_ENV_$1
+function read_env {
+  tier=$1
+  shift
 
-  if [ -t 0 ]; then
-	  config=""
-  else
-	  config="--config=/dev/null"
-  fi
+  while [ $# -gt 0 ]; do
+    eval value="\$POT_${1^^}_$tier"
+    if [ -z "$value" ]; then
+		  eval value="\$POT_${1^^}"
+    fi
+
+    eval $1="$value"
+    shift
+  done
+}
+
+function init_rhc_config {
+  read_env $1 server user password namespace app env
 
   if [ -z "$server" ]; then
 	  server="openshift.redhat.com"
   fi
+
+  echo "pot $action $@"
+  echo "server: $server"
+  echo "namespace: $namespace"
+  echo "app: $app"
+  echo "env: $env"
+  echo "user: $user"
+  echo
 
   if [ "$user" ]; then
 	  user="-l$user"
@@ -45,6 +58,16 @@ function init_rhc_config {
 
   if [ "$namespace" ]; then
 	  namespace="-n$namespace"
+  fi
+
+  [ "$app" ] || { echo "Application name missing (POT_APP_<env> or POT_APP)" >&2 && exit 1; }
+
+  if [ -t 0 ]; then
+	  config=""
+  else
+    [ "$user" ] || { echo "Username missing (POT_USER_<env> or POT_USER)" >&2 && exit 1; }
+    [ "$password" ] || { echo "Password missing (POT_PASSWORD_<env> or POT_USER)" >&2 && exit 1; }
+	  config="--config=/dev/null"
   fi
 }
 
@@ -110,7 +133,7 @@ function cmd_git_url {
   init_rhc_config $1
   shift
 
-  eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server -n$namespace -a$app -l$user -p$password ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
+  eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server $namespace -a$app $user $password ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
   echo "ssh://${_OPENSHIFT_APP_UUID}@${_OPENSHIFT_APP_DNS}/~/git/${_OPENSHIFT_APP_NAME}.git/"
 }
 
