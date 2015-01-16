@@ -19,7 +19,7 @@ action=$1
 shift
 
 function read_env {
-  tier=$1
+  tier="$1"
   shift
 
   while [ $# -gt 0 ]; do
@@ -34,7 +34,7 @@ function read_env {
 }
 
 function init_rhc_config {
-  read_env $1 server user password namespace app env
+  read_env "$1" server user password namespace app env
 
   if [ -z "$server" ]; then
 	  server="openshift.redhat.com"
@@ -66,7 +66,7 @@ function init_rhc_config {
 	  config=""
   else
     [ "$user" ] || { echo "Username missing (POT_USER_<env> or POT_USER)" >&2 && exit 1; }
-    [ "$password" ] || { echo "Password missing (POT_PASSWORD_<env> or POT_USER)" >&2 && exit 1; }
+    [ "$password" ] || { echo "Password missing (POT_PASSWORD_<env> or POT_PASSWORD)" >&2 && exit 1; }
 	  config="--config=/dev/null"
   fi
 }
@@ -125,7 +125,7 @@ function cmd_deploy {
 		rhc $config --server=$server $namespace $user $password -a$app env set $env
 	fi
 
-	rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary
+	rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary >/dev/null
   rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz
 }
 
@@ -137,6 +137,13 @@ function cmd_git_url {
   echo "ssh://${_OPENSHIFT_APP_UUID}@${_OPENSHIFT_APP_DNS}/~/git/${_OPENSHIFT_APP_NAME}.git/"
 }
 
+function sshkey {
+  POT_APP="-"
+  init_rhc_config ""
+
+  rhc $config --server=$server $user $password sshkey "$@"
+}
+
 case $action in
 	tar)
 	  cmd_tar "$@"
@@ -146,6 +153,9 @@ case $action in
 	  ;;
   git-url)
     cmd_git_url "$@"
+    ;;
+  sshkey)
+    sshkey "$@"
     ;;
   *)
   	usage
