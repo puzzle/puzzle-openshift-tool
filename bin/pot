@@ -126,7 +126,7 @@ function cmd_deploy {
 	fi
 
 	rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary >/dev/null
-  rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz
+  rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz "$@"
 }
 
 function cmd_git_url {
