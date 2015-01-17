@@ -122,18 +122,18 @@ function cmd_deploy {
   shift
 
 	if [ "$env" ]; then
-		rhc $config --server=$server $namespace $user $password -a$app env set $env
+		rhc $config --server=$server $namespace $user "${password[@]}" -a$app env set $env
 	fi
 
-	rhc $config --server=$server $namespace $user $password -a$app app configure --deployment-type binary >/dev/null
-  rhc $config --server=$server $namespace $user $password -a$app app deploy deployment.tar.gz "$@"
+	rhc $config --server=$server $namespace $user "${password[@]}" -a$app app configure --deployment-type binary >/dev/null
+  rhc $config --server=$server $namespace $user "${password[@]}" -a$app app deploy deployment.tar.gz "$@"
 }
 
 function cmd_git_url {
   init_rhc_config $1
   shift
 
-  eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server $namespace -a$app $user $password ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
+  eval `rhc "--ssh=ssh -o StrictHostKeyChecking=no" --config=/dev/null --server=$server $namespace -a$app $user "${password[@]}" ssh env|grep ^OPENSHIFT|sed -e 's/^OPENSHIFT/_OPENSHIFT/' | tr '\n' ';'`
   echo "ssh://${_OPENSHIFT_APP_UUID}@${_OPENSHIFT_APP_DNS}/~/git/${_OPENSHIFT_APP_NAME}.git/"
 }
 
@@ -141,7 +141,7 @@ function sshkey {
   POT_APP="-"
   init_rhc_config ""
 
-  rhc $config --server=$server $user $password sshkey "$@"
+  rhc $config --server=$server $user "${password[@]}" sshkey "$@"
 }
 
 case $action in
