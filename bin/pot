@@ -25,7 +25,10 @@ function read_env {
   while [ $# -gt 0 ]; do
     eval value="\$POT_${1^^}_$tier"
     if [ -z "$value" ]; then
-		  eval value="\$POT_${1^^}"
+      eval value="\$POT_${1^^}_${tier^^}"
+      if [ -z "$value" ]; then
+  		  eval value="\$POT_${1^^}"
+      fi
     fi
 
     eval $1="$value"
