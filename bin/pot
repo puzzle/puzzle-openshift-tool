@@ -1,4 +1,3 @@
-
 #! /bin/bash
 
 # Copyright 2014 Daniel Tschan <tschan@puzzle.ch>.
@@ -31,7 +30,7 @@ function read_env {
       fi
     fi
 
-    eval $1="$value"
+    eval $1="\$value"
     shift
   done
 }
@@ -124,11 +123,12 @@ function cmd_deploy {
   init_rhc_config $1
   shift
 
-	if [ "$env" ]; then
-		rhc $config --server=$server $namespace $user "${password[@]}" -a$app env set $env
-	fi
+  if [ "$env" ]; then
+    eval env=($env)  # Needed for correct interpretation of quotes and escapes
+    rhc $config --server=$server $namespace $user "${password[@]}" -a$app env set "${env[@]}"
+  fi
 
-	rhc $config --server=$server $namespace $user "${password[@]}" -a$app app configure --deployment-type binary >/dev/null
+  rhc $config --server=$server $namespace $user "${password[@]}" -a$app app configure --deployment-type binary >/dev/null
   rhc $config --server=$server $namespace $user "${password[@]}" -a$app app deploy deployment.tar.gz "$@"
 }
 
